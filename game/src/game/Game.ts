@@ -39,14 +39,14 @@ function weighted<T extends string>(w: Record<T, number>): T | null {
 }
 
 const SKY: Record<TimeOfDay, { sky: number; fog: number; hemi: number; sun: number; ground: number }> = {
-  day: { sky: 0xf3dcae, fog: 0xf3dcae, hemi: 1.0, sun: 1.4, ground: 0xc9ac78 },
-  evening: { sky: 0xf0a86a, fog: 0xe8a070, hemi: 0.75, sun: 1.0, ground: 0xb08c64 },
+  day: { sky: 0xe9cfa0, fog: 0xe9cfa0, hemi: 1.1, sun: 2.2, ground: 0xc9ac78 },
+  evening: { sky: 0xf0a86a, fog: 0xe8a070, hemi: 0.8, sun: 1.6, ground: 0xb08c64 },
   night: { sky: 0x0c1022, fog: 0x0c1022, hemi: 0.25, sun: 0.1, ground: 0x3a3226 },
 };
 
 export interface HudState {
   hp: number; maxHp: number; coins: number; speed: number; remaining: number; progress: number;
-  next: string; nextDist: number; magnet: number; shield: number; combo: number;
+  next: string; nextDist: number; magnet: number; shield: number; combo: number; status: string;
 }
 
 export class Game {
@@ -80,24 +80,24 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: save.settings.quality === "high", powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(save.settings.quality === "high" ? 2 : 1, devicePixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene.fog = new THREE.Fog(0xf3dcae, 50, 190);
-    this.scene.background = new THREE.Color(0xf3dcae);
-    this.sun.position.set(-8, 14, 6);
-    this.scene.add(this.hemi, this.sun);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.shadowMap.enabled = save.settings.quality === "high";
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.scene.fog = new THREE.Fog(0xe9cfa0, 50, 190);
+    this.scene.background = new THREE.Color(0xe9cfa0);
+    this.sun.position.set(-8, 16, 6);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(this.sun.shadow.camera, { left: -12, right: 12, top: 14, bottom: -14, near: 1, far: 60 });
+    this.sun.shadow.bias = -0.0008;
+    this.scene.add(this.hemi, this.sun, this.sun.target);
 
-    // road texture: asphalt with patches, cracks, lane dashes and yellow edges
-    const c = document.createElement("canvas"); c.width = 512; c.height = 512; const x = c.getContext("2d")!;
-    x.fillStyle = "#4a4a4d"; x.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 2500; i++) { x.fillStyle = ["#444447", "#525255", "#3d3d40", "#57534c"][i % 4]; x.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 3, 2 + Math.random() * 3); }
-    for (let i = 0; i < 6; i++) { x.fillStyle = "rgba(30,30,32,.45)"; x.fillRect(40 + Math.random() * 400, Math.random() * 512, 40 + Math.random() * 60, 30 + Math.random() * 80); }
-    x.strokeStyle = "rgba(20,20,20,.6)"; x.lineWidth = 2;
-    for (let i = 0; i < 8; i++) { x.beginPath(); let px = Math.random() * 512, py = Math.random() * 512; x.moveTo(px, py); for (let k = 0; k < 5; k++) { px += (Math.random() - .5) * 40; py += Math.random() * 30; x.lineTo(px, py); } x.stroke(); }
-    x.fillStyle = "#ececec"; for (const lx of [170, 338]) x.fillRect(lx, 0, 8, 256);
-    x.fillStyle = "#f5c518"; x.fillRect(6, 0, 10, 512); x.fillRect(496, 0, 10, 512);
-    this.roadTex = new THREE.CanvasTexture(c); this.roadTex.wrapT = THREE.RepeatWrapping; this.roadTex.repeat.set(1, 30);
-    this.roadTex.colorSpace = THREE.SRGBColorSpace; this.roadTex.anisotropy = 8;
+    this.roadTex = roadTexture(true);
+    this.smoothTex = roadTexture(false);
 
-    this.bike = M.makeBike(save.paint === "classic" ? "#d62828" : "#d62828");
+    this.bike = M.makeBike(paintColor());
+    castShadows(this.bike.group);
     this.scene.add(this.bike.group);
     this.buildStatic();
     this.resize();
@@ -112,15 +112,24 @@ export class Game {
   }
 
   private buildStatic() {
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, 420, 1, 60), M.texMat(this.roadTex));
-    road.rotation.x = -Math.PI / 2; road.position.set(0, 0, -170); this.scene.add(road);
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 420, 1, 60), M.mat(0xc9ac78));
-    this.ground.rotation.x = -Math.PI / 2; this.ground.position.set(0, -0.03, -170); this.scene.add(this.ground);
-    // BRT Red Line corridor on the left: barriers and half-built concrete; footpath on the right
-    const median = M.box(2.6, 0.9, 420, 0xb8b0a0, -ROAD_W / 2 - 1.3, 0.45, -170); this.scene.add(median);
-    const stripe = M.box(2.62, 0.18, 420, 0xd9480f, -ROAD_W / 2 - 1.3, 0.8, -170); this.scene.add(stripe);
-    const path = M.box(2.2, 0.25, 420, 0xa39b8e, ROAD_W / 2 + 1.1, 0.12, -170); this.scene.add(path);
-    const brtDeck = M.box(7, 0.6, 420, 0x9c9488, -ROAD_W / 2 - 6, 0.3, -170); this.scene.add(brtDeck);
+    this.roughRoad = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W + 1.6, 420, 1, 60), M.texMat(this.roadTex));
+    this.smoothRoad = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, 420, 1, 60), M.texMat(this.smoothTex));
+    for (const r of [this.roughRoad, this.smoothRoad]) { r.rotation.x = -Math.PI / 2; r.position.set(0, 0, -170); r.receiveShadow = true; this.scene.add(r); }
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 420, 1, 60), M.texMat(dirtTexture()));
+    this.ground.rotation.x = -Math.PI / 2; this.ground.position.set(0, -0.03, -170); this.ground.receiveShadow = true; this.scene.add(this.ground);
+    // Left side: BRT Red Line corridor. Under construction = green hoarding and rubble;
+    // once the stretch's construction is fixed, the finished elevated track appears instead.
+    this.brtWorks = new THREE.Group();
+    const hoard = M.makeHoarding(420); hoard.position.set(-ROAD_W / 2 - 1.6, 0, -170); this.brtWorks.add(hoard);
+    this.brtWorks.add(M.box(7, 0.5, 420, 0x9c9488, -ROAD_W / 2 - 6, 0.25, -170));
+    for (let i = 0; i < 18; i++) { const s = M.makeSand(); s.position.set(-ROAD_W / 2 - 4 - Math.random() * 4, 0.4, -i * 22); this.brtWorks.add(s); }
+    this.scene.add(this.brtWorks);
+    this.brtDone = M.makeElevatedBRT(420); this.brtDone.position.set(-ROAD_W / 2 - 4.5, 0, -170); this.brtDone.visible = false;
+    this.brtDone.add(M.box(1.2, 0.3, 420, 0xf5c518, 3.9, 0.15, 0)); // painted kerb
+    this.scene.add(this.brtDone);
+    const path = M.box(2.2, 0.25, 420, 0xa39b8e, ROAD_W / 2 + 1.1, 0.12, -170); path.receiveShadow = true; this.scene.add(path);
+    // overhead power lines on the right (poles are recycled with the scenery)
+    for (const dx of [-0.9, 0, 0.9]) this.scene.add(M.box(0.03, 0.03, 420, 0x1a1a1a, ROAD_W / 2 + 7.5 + dx, 8.45 - Math.abs(dx) * 0.1, -170));
 
     // particles: dust & rain
     const pg = new THREE.BufferGeometry(); const pn = 500; const pp = new Float32Array(pn * 3);
@@ -161,7 +170,20 @@ export class Game {
       const b = M.makeBillboard(); b.position.x = -ROAD_W / 2 - 10; b.rotation.y = 0.35;
       this.scene.add(b); this.scenery.push({ obj: b, at: i * 90 + 40 });
     }
+    for (let i = 0; i < 9; i++) {
+      const p = M.makePowerPole(); p.position.x = ROAD_W / 2 + 7.5;
+      this.scene.add(p); this.scenery.push({ obj: p, at: i * 30 + 8 });
+    }
+    for (let i = 0; i < 6; i++) {
+      const c = M.makeCrowd(2 + Math.floor(Math.random() * 4)); c.position.x = ROAD_W / 2 + 0.6;
+      this.scene.add(c); this.scenery.push({ obj: c, at: i * 45 + 20 });
+    }
+    for (const s of this.scenery) castShadows(s.obj);
   }
+  roughRoad!: THREE.Mesh; smoothRoad!: THREE.Mesh; smoothTex: THREE.CanvasTexture;
+  brtWorks!: THREE.Group; brtDone!: THREE.Group;
+  ended = false; warned = new Set<string>(); swerveCd = 0; status = ""; skyCol = new THREE.Color(0xe9cfa0);
+  onBanner?: (text: string, kind: "goal" | "warn" | "swerve-left" | "swerve-right" | "info") => void;
 
   // ---------- ride lifecycle ----------
   start(opts: RideOptions) {
@@ -183,11 +205,22 @@ export class Game {
       const lm = M.makeLandmark(p.kind, p.id, p.name);
       if (this.dir < 0) lm.scale.x = -1; // keep landmarks on the correct side when riding back
       grp.add(lm);
+      grp.userData.name = p.name; castShadows(grp);
       this.scene.add(grp); this.landmarks.push({ obj: grp, at });
     });
-    this.running = true; this.paused = false;
+    // destination campuses: the gate stands across the end of the ride, like arriving at the real entrance
+    if (b.id === "ned" || b.id === "ku") {
+      const gate = M.makeCampusGate(b.id === "ned" ? "NED UET, KARACHI" : "UNIVERSITY OF KARACHI", b.id === "ned" ? "#b0784a" : "#cdb48a");
+      const grp = new THREE.Group(); grp.add(gate); grp.userData.name = b.name; castShadows(grp);
+      this.scene.add(grp); this.landmarks.push({ obj: grp, at: this.len + 16 });
+    }
+    this.running = true; this.paused = false; this.ended = false;
+    this.warned = new Set(); this.swerveCd = 0;
     audio.startEngine();
+    setTimeout(() => this.onBanner?.(`GOAL: Reach ${b.name} (${Math.abs(b.km - a.km).toFixed(1)}km)`, "goal"), 300);
   }
+  /** Back to the idle menu backdrop. */
+  reset() { this.running = false; this.ended = false; this.paused = false; this.clearRide(); audio.stopEngine(); }
   private clearRide() {
     for (const o of this.objs) if (o.mesh) this.scene.remove(o.mesh);
     for (const l of this.landmarks) this.scene.remove(l.obj);
@@ -198,10 +231,11 @@ export class Game {
     const sky = new THREE.Color(weather === "rain" ? (time === "night" ? 0x0a0d18 : 0x8f98a3) : s.sky);
     (this.scene.background as THREE.Color).copy(sky);
     this.scene.fog!.color.copy(sky);
+    this.skyCol.copy(sky);
     this.hemi.intensity = s.hemi * (weather === "rain" ? 0.8 : 1);
     this.sun.intensity = s.sun * (weather === "rain" ? 0.4 : 1);
     this.sun.color.set(time === "evening" ? 0xffb070 : 0xffffff);
-    (this.ground.material as THREE.MeshLambertMaterial).color.set(weather === "rain" ? 0x7d6c55 : s.ground);
+    (this.ground.material as THREE.MeshStandardMaterial).color.set(weather === "rain" ? 0x9a8a76 : time === "night" ? 0x6a6258 : 0xffffff);
     const night = time === "night";
     this.buildScenery(night);
     this.bike.headlight.intensity = night || weather === "rain" ? 60 : 0;
@@ -257,7 +291,7 @@ export class Game {
         this.add({ kind, at, x: cx, w, d: rnd(5, 8), sec }, M.makeGutter(w, 7)); return two ? -1 : lane;
       }
       case "breaker": this.add({ kind, at, x: 0, w: ROAD_W, d: 0.7, sec }, M.makeBreaker(ROAD_W)); return -1;
-      case "barrier": this.add({ kind, at, x, w: 2.1, d: 1.2, sec }, M.makeBarrier()); return lane;
+      case "barrier": this.add({ kind, at, x, w: 2.1, d: 1.2, sec }, castShadows(Math.random() < 0.4 ? M.makeRoadClosed() : M.makeBarrier())); return lane;
       case "sand": this.add({ kind, at, x, w: 2.2, d: 1.8, sec }, M.makeSand()); return lane;
       case "walker": {
         const L = Math.random() < 0.5;
@@ -376,6 +410,7 @@ export class Game {
     });
     this.dust += ((inDust ? 1 : 0) - this.dust) * Math.min(1, dt * 2);
 
+    this.callouts(dt);
     audio.setEngine(this.v); audio.musicTick(dt);
     if (this.hp <= 0) return this.end(false);
     if (this.prog >= this.len) return this.end(true);
@@ -407,8 +442,31 @@ export class Game {
     }
   }
 
+  /** Mockup-style warnings: goal, dust storm ahead, SWERVE!, gate approaching, road status. */
+  private callouts(dt: number) {
+    this.swerveCd = Math.max(0, this.swerveCd - dt);
+    const sec = sectionAt(this.roadPos(Math.min(this.prog, this.len - 1)));
+    for (const o of this.objs) {
+      const ahead = o.at - this.prog;
+      if (o.kind === "dust" && ahead > 0 && ahead < 70 && !this.warned.has("dust" + o.at)) { this.warned.add("dust" + o.at); this.onBanner?.("WARNING: Dust Storm!", "warn"); }
+      if (this.swerveCd === 0 && !o.hit && ahead > 14 && ahead < 26 && Math.abs(o.x - LANES[this.lane]) < o.w / 2 + 0.3 &&
+          ["pothole", "manhole", "barrier", "sand", "cattle", "wrongway"].includes(o.kind)) {
+        const free = [this.lane - 1, this.lane + 1].filter(l => l >= 0 && l <= 2);
+        this.onBanner?.("SWERVE!", free[0] < this.lane ? "swerve-left" : "swerve-right"); this.swerveCd = 2.5;
+      }
+    }
+    const realLeft = (this.len - this.prog) / 600;
+    if (realLeft < 0.5 && !this.warned.has("gate")) {
+      this.warned.add("gate");
+      const kind = this.dest.kind === "university" ? "Gate" : "";
+      this.onBanner?.(`${this.dest.name}${kind ? " " + kind : ""} in 0.5km`, "info");
+    }
+    this.status = this.slow > 0 ? "Gutter ka Paani" : this.dust > 0.5 ? "Dust Storm" : !isFixed(sec, "potholes") ? "Road is rugged" : "Road is smooth";
+  }
+
   private end(arrived: boolean) {
-    this.running = false; audio.stopEngine();
+    this.running = false; this.ended = arrived; audio.stopEngine();
+    if (arrived) setTimeout(() => this.onBanner?.("GOAL REACHED!", "goal"), 0);
     const bonus = arrived ? 20 + Math.round(this.hp / this.maxHp * 30) : 0;
     if (arrived) audio.win();
     this.onEnd?.({ arrived, coins: arrived ? this.coins : Math.floor(this.coins / 2), bonus, distance: this.prog, hp: Math.max(0, this.hp), dest: this.dest, hits: this.hits, sections: [...this.secs].sort((a, b) => a - b), time: this.t });
@@ -416,11 +474,19 @@ export class Game {
 
   // ---------- render ----------
   private render(dt: number) {
-    const prog = this.running || this.prog > 0 ? this.prog : (performance.now() / 1000) * 9;
-    const idle = !this.running;
-    if (idle && !this.paused) this.prog = 0;
-    const p = idle ? (performance.now() / 1000) * 9 : prog;
-    this.roadTex.offset.y = p / 14;
+    // after arriving, the bike rolls to a stop in front of the destination
+    if (this.ended) { this.v = Math.max(0, this.v - 12 * dt); this.prog += this.v * dt; this.t += dt; this.x += (0 - this.x) * Math.min(1, dt * 3); this.lane = 1; }
+    const idle = !this.running && !this.ended;
+    const prog = idle ? (performance.now() / 1000) * 9 : this.prog;
+    const p = prog;
+    this.roadTex.offset.y = p / 14; this.smoothTex.offset.y = p / 14;
+    const sec = this.opts ? sectionAt(this.roadPos(Math.max(0, Math.min(this.prog, this.len - 1)))) : 0;
+    const smooth = !idle && isFixed(sec, "potholes");
+    this.smoothRoad.visible = smooth; this.roughRoad.visible = !smooth;
+    const built = !idle && isFixed(sec, "construction");
+    this.brtDone.visible = built; this.brtWorks.visible = !built;
+    const bus = this.brtDone.getObjectByName("brtBus"); if (bus) bus.position.z = -((performance.now() / 1000 * 14) % 300) + 150;
+    this.sun.position.set(this.x - 8, 16, 6); this.sun.target.position.set(this.x, 0, -6);
     for (const s of this.scenery) { let z = (s.at - p) % 270; if (z < -20) z += 270; s.obj.position.z = -z; }
     for (const l of this.landmarks) l.obj.position.z = -(l.at - prog);
 
@@ -442,6 +508,7 @@ export class Game {
     // weather & dust
     const [n, f] = this.baseFog;
     const fog = this.scene.fog as THREE.Fog; fog.near = n - (n - 2) * this.dust; fog.far = f - (f - 24) * this.dust;
+    fog.color.copy(this.skyCol).lerp(DUST_COL, this.dust * 0.9); (this.scene.background as THREE.Color).copy(fog.color);
     (this.dustPts.material as THREE.PointsMaterial).opacity = 0.85 * this.dust;
     const dp = this.dustPts.geometry.attributes.position.array as Float32Array;
     for (let i = 0; i < dp.length; i += 3) { dp[i + 2] += (this.v + 8) * dt; dp[i] += 5 * dt; if (dp[i + 2] > 7) { dp[i + 2] = -70; dp[i] = rnd(-14, 14); } }
@@ -460,8 +527,8 @@ export class Game {
   private hudTick() {
     if (!this.onHud || !this.running) return;
     let next = this.dest.name, nextDist = this.len - this.prog;
-    for (const l of this.landmarks) { const d = l.at - this.prog; if (d > 0 && d < nextDist) { nextDist = d; next = (l.obj.children[1] as THREE.Object3D).userData.name; } }
-    this.onHud({ hp: this.hp, maxHp: this.maxHp, coins: this.coins, speed: this.v * 3.2, remaining: Math.max(0, this.len - this.prog), progress: Math.min(1, this.prog / this.len), next, nextDist, magnet: this.magnet, shield: this.shield, combo: this.combo });
+    for (const l of this.landmarks) { const d = l.at - this.prog; if (d > 0 && d < nextDist) { nextDist = d; next = l.obj.userData.name ?? next; } }
+    this.onHud({ hp: this.hp, maxHp: this.maxHp, coins: this.coins, speed: this.v * 3.2, remaining: Math.max(0, this.len - this.prog), progress: Math.min(1, this.prog / this.len), next, nextDist, magnet: this.magnet, shield: this.shield, combo: this.combo, status: this.status });
   }
 
   private loop = (now: number) => {
@@ -475,6 +542,48 @@ export class Game {
 
 export const paintColor = () => ({ classic: "#d62828", black: "#1c1c1f", blue: "#1f6feb", green: "#11823b", gold: "#d4a017" } as Record<string, string>)[save.paint] ?? "#d62828";
 export const upgradeLevel = (id: (typeof UPGRADES)[number]["id"]) => save.upgrades[id];
+
+const DUST_COL = new THREE.Color(0xc98a45);
+
+function castShadows<T extends THREE.Object3D>(o: T): T {
+  if (!save.settings.quality || save.settings.quality === "high") o.traverse(c => { if ((c as THREE.Mesh).isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+  return o;
+}
+
+/** Asphalt texture. Rough: patched, cracked, crumbling dirt edges. Smooth: fresh tarmac after the fix. */
+function roadTexture(rough: boolean) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 1024; const x = c.getContext("2d")!;
+  const W = 512, H = 1024, edge = rough ? 40 : 0;
+  x.fillStyle = rough ? "#5a5650" : "#38393c"; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < 6000; i++) {
+    x.fillStyle = rough ? ["#4f4b45", "#615c55", "#47443f", "#6b655b"][i % 4] : ["#333437", "#3d3e41", "#2f3033"][i % 3];
+    x.fillRect(Math.random() * W, Math.random() * H, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  if (rough) {
+    for (let i = 0; i < 10; i++) { x.fillStyle = `rgba(${Math.random() < .5 ? "40,38,35" : "120,105,85"},.35)`; x.fillRect(edge + Math.random() * (W - 2 * edge - 120), Math.random() * H, 50 + Math.random() * 90, 40 + Math.random() * 120); }
+    x.strokeStyle = "rgba(25,22,20,.7)"; x.lineWidth = 2;
+    for (let i = 0; i < 16; i++) { x.beginPath(); let px = Math.random() * W, py = Math.random() * H; x.moveTo(px, py); for (let k = 0; k < 6; k++) { px += (Math.random() - .5) * 50; py += Math.random() * 40; x.lineTo(px, py); } x.stroke(); }
+    // crumbling sand-coloured edges where the asphalt meets the dirt shoulder
+    for (const side of [0, 1]) for (let y = 0; y < H; y += 6) {
+      const w = edge * (0.5 + Math.random() * 0.8);
+      x.fillStyle = "#b39a72"; x.fillRect(side ? W - w : 0, y, w, 7);
+    }
+    x.fillStyle = "rgba(235,235,235,.55)"; for (const lx of [176, 330]) for (let y = 0; y < H; y += 128) if (Math.random() < 0.7) x.fillRect(lx, y, 7, 50 + Math.random() * 20);
+  } else {
+    x.fillStyle = "#f4f4f4"; for (const lx of [168, 336]) for (let y = 0; y < H; y += 128) x.fillRect(lx, y, 8, 64);
+    x.fillStyle = "#f5c518"; x.fillRect(8, 0, 10, H); x.fillRect(W - 18, 0, 10, H);
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 15);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+
+function dirtTexture() {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 256; const x = c.getContext("2d")!;
+  x.fillStyle = "#c2a679"; x.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 3000; i++) { x.fillStyle = ["#b39770", "#cfb48a", "#a88c64", "#d6bf98"][i % 4]; x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 4); }
+  for (let i = 0; i < 30; i++) { x.fillStyle = "#8e7a5c"; x.fillRect(Math.random() * 256, Math.random() * 256, 3, 3); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(40, 70); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 
 function vibrate(ms: number) {
   if (!save.settings.haptics) return;

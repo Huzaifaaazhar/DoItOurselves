@@ -30,20 +30,21 @@ export function mat(color: number | string, opts: { emissive?: number; transpare
   if (!m) {
     m = opts.basic
       ? new THREE.MeshBasicMaterial({ color, transparent: opts.transparent, opacity: opts.opacity ?? 1 })
-      : new THREE.MeshLambertMaterial({ color, emissive: opts.emissive ?? 0, transparent: opts.transparent, opacity: opts.opacity ?? 1, flatShading: true });
+      : new THREE.MeshStandardMaterial({ color, emissive: opts.emissive ?? 0, transparent: opts.transparent, opacity: opts.opacity ?? 1, roughness: 0.88, metalness: 0.02, flatShading: true });
     cache.set(key, patch(m));
   }
   return m;
 }
 export const texMat = (map: THREE.Texture, basic = false) =>
-  patch(basic ? new THREE.MeshBasicMaterial({ map, transparent: true }) : new THREE.MeshLambertMaterial({ map }));
+  patch(basic ? new THREE.MeshBasicMaterial({ map, transparent: true }) : new THREE.MeshStandardMaterial({ map, roughness: 0.92, metalness: 0 }));
 export const ownMat = (color: number) => patch(new THREE.MeshBasicMaterial({ color }));
 
 // ---------- primitives ----------
 const geo = new Map<string, THREE.BufferGeometry>();
 const g = <T extends THREE.BufferGeometry>(k: string, f: () => T) => (geo.get(k) as T) ?? (geo.set(k, f()), geo.get(k) as T);
 export function box(w: number, h: number, d: number, c: number | string | THREE.Material, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(g(`b${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d)), c instanceof THREE.Material ? c : mat(c));
+  // long boxes need depth segments so the curved-world shader can bend them with the road
+  const m = new THREE.Mesh(g(`b${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d, 1, 1, d > 20 ? Math.ceil(d / 4) : 1)), c instanceof THREE.Material ? c : mat(c));
   m.position.set(x, y, z); return m;
 }
 export function cyl(rt: number, rb: number, h: number, c: number | string, seg = 12) {
@@ -90,18 +91,25 @@ export function makeBike(paint: string): BikeRig {
   (lamp.material as THREE.MeshLambertMaterial) = mat(0xfff6c0, { emissive: 0x8a7a30 }) as THREE.MeshLambertMaterial;
   grp.add(lamp);
   grp.add(box(0.2, 0.1, 0.05, 0xff2a2a, 0, 0.75, 0.84)); // tail light
-  // rider in shalwar kameez
+  // rider: brown jacket, jeans, backpack, full-face helmet
   const rider = new THREE.Group();
-  const shirt = 0xf1efe6;
-  const torso = box(0.52, 0.66, 0.34, shirt, 0, 1.5, 0.22); torso.rotation.x = -0.25; rider.add(torso);
-  rider.add(box(0.5, 0.25, 0.6, shirt, 0, 1.18, 0.3)); // kameez over seat
+  const jacket = 0x6b4a33, jeans = 0x34465c;
+  const torso = box(0.56, 0.7, 0.36, jacket, 0, 1.52, 0.22); torso.rotation.x = -0.28; rider.add(torso);
+  rider.add(box(0.5, 0.22, 0.62, jeans, 0, 1.17, 0.3)); // hips on the seat
+  const pack = box(0.46, 0.56, 0.24, 0x7a5a3a, 0, 1.6, 0.48); pack.rotation.x = -0.28; rider.add(pack);
+  rider.add(box(0.36, 0.2, 0.06, 0x5c4129, 0, 1.45, 0.62)); // backpack pocket
   for (const s of [-1, 1]) {
-    const arm = box(0.13, 0.13, 0.62, shirt, s * 0.3, 1.48, -0.18); arm.rotation.x = 0.35; rider.add(arm);
-    rider.add(box(0.15, 0.4, 0.15, 0xe9e5d8, s * 0.27, 0.86, -0.12)); // shin
-    rider.add(box(0.15, 0.12, 0.28, 0x3b2a1a, s * 0.27, 0.66, -0.2)); // chappal
+    rider.add(box(0.05, 0.6, 0.05, 0x3a2a1a, s * 0.17, 1.62, 0.36)); // straps
+    const arm = box(0.14, 0.14, 0.62, jacket, s * 0.31, 1.5, -0.18); arm.rotation.x = 0.35; rider.add(arm);
+    rider.add(box(0.12, 0.12, 0.12, 0x2a2a2a, s * 0.4, 1.3, -0.5)); // gloves on grips
+    rider.add(box(0.17, 0.2, 0.5, jeans, s * 0.25, 1.05, -0.05)); // thigh
+    rider.add(box(0.16, 0.42, 0.16, jeans, s * 0.27, 0.8, -0.28)); // shin
+    rider.add(box(0.17, 0.14, 0.3, 0x2b1d12, s * 0.27, 0.58, -0.33)); // shoe
   }
-  const head = sphere(0.21, 0xc68e5e); head.position.set(0, 2.0, 0.08); rider.add(head);
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(0x222222)); helmet.position.set(0, 2.03, 0.08); rider.add(helmet);
+  rider.add(box(0.18, 0.12, 0.18, 0xb88458, 0, 1.92, 0.12)); // neck
+  const helmet = sphere(0.28, 0x3a3d42, 14); helmet.position.set(0, 2.1, 0.08); helmet.scale.set(1, 1.05, 1.12); rider.add(helmet);
+  const visor = box(0.4, 0.16, 0.05, 0x111418, 0, 2.08, -0.22); rider.add(visor);
+  rider.add(box(0.04, 0.3, 0.44, 0xd9480f, 0, 2.26, 0.1)); // helmet stripe
   grp.add(rider);
   const headlight = new THREE.SpotLight(0xfff2c4, 0, 45, 0.45, 0.5, 1.2);
   headlight.position.set(0, 1.1, -0.8); headlight.target.position.set(0, 0, -20); grp.add(headlight, headlight.target);
@@ -364,8 +372,13 @@ export function makeLandmark(kind: string, id: string, name: string): THREE.Grou
     const tower = cyl(0.6, 1, 6, 0xf1efe6, 8); tower.position.set(-14, 3.4, 0); grp.add(tower);
     const top = sphere(1, 0x2b8a3e, 8); top.position.set(-14, 6.8, 0); grp.add(top);
     for (const s of [-1, 1]) { const st = box(14, 0.03, 7, 0x4a4a4c, s * 11, 0.01, 0); grp.add(st); }
+  } else if (id === "ned" || id === "ku") {
+    grp.add(makeCampusGate(id === "ned" ? "NED UET, KARACHI" : "UNIVERSITY OF KARACHI", id === "ned" ? "#b0784a" : "#cdb48a"));
+    const col = id === "ned" ? 0xa66f45 : 0xd9cdb4;
+    for (let i = 0; i < 3; i++) grp.add(box(10, 6 + i * 2, 8, col, 24 + i * 4, 3 + i, -12 - i * 12));
+    for (let i = 0; i < 4; i++) { const t = makeTree(); t.position.set(i % 2 ? 12 : -14, 0, -6 - i * 5); grp.add(t); }
   } else if (kind === "university") {
-    const col = id === "ned" ? 0x8c2d19 : id === "ku" ? 0xd9cdb4 : 0xb5a58a;
+    const col = 0xb5a58a;
     for (const s of [-1, 1]) grp.add(box(1.4, 7, 1.4, col, s * 7.5, 3.5, 0));
     grp.add(box(16.4, 1.8, 1.4, col, 0, 7.5, 0));
     const t = textTexture([{ text: name, font: "bold 46px Poppins, sans-serif", color: "#11291b" }], 640, 90, "#f1e9d2", "");
@@ -385,5 +398,93 @@ export function makeLandmark(kind: string, id: string, name: string): THREE.Grou
     grp.add(box(30, 4, 8, 0xced4da, 26, 2, 8));
   }
   grp.userData.name = name;
+  return grp;
+}
+
+// ---------- mockup-inspired set pieces ----------
+let brickTex: THREE.Texture | null = null;
+function brick(color: string) {
+  if (!brickTex) {
+    const c = document.createElement("canvas"); c.width = 128; c.height = 128; const x = c.getContext("2d")!;
+    x.fillStyle = "#e6d6bd"; x.fillRect(0, 0, 128, 128);
+    for (let r = 0; r < 8; r++) for (let k = 0; k < 5; k++) {
+      x.fillStyle = `hsl(${24 + Math.random() * 8}, ${40 + Math.random() * 15}%, ${48 + Math.random() * 10}%)`;
+      x.fillRect(k * 32 - (r % 2) * 16 + 1, r * 16 + 1, 30, 14);
+    }
+    brickTex = new THREE.CanvasTexture(c); brickTex.colorSpace = THREE.SRGBColorSpace;
+    brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping; brickTex.repeat.set(2, 4);
+  }
+  const m = texMat(brickTex) as THREE.MeshStandardMaterial; m.color.set(color); return m;
+}
+
+/** Brick campus gate with an arch, round emblems and iron gates (NED / KU style). */
+export function makeCampusGate(text: string, color: string) {
+  const grp = new THREE.Group();
+  const b = brick(color);
+  for (const s of [-1, 1]) {
+    grp.add(box(2.2, 7, 1.8, b, s * 6.2, 3.5, 0));
+    grp.add(box(2.6, 0.4, 2.2, 0xe9dcc3, s * 6.2, 7.1, 0));
+    const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20), mat(0xf4ecdc)); emblem.position.set(s * 6.2, 4.6, 0.91); grp.add(emblem);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 20), mat(0x6b4a33)); ring.position.set(s * 6.2, 4.6, 0.92); grp.add(ring);
+    for (const w of [-1, 1]) grp.add(box(2.4, 2.6, 0.4, b, s * 6.2 + w * 2.6, 1.3, 0)); // side walls
+  }
+  grp.add(box(10.2, 1.8, 1.4, b, 0, 7.6, 0));
+  const t = textTexture([{ text, font: "bold 64px Poppins, sans-serif", color: "#2a1d12" }], 900, 120, "#efe3cc", "");
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(9.4, 1.25), texMat(t)); plate.position.set(0, 7.6, 0.71); grp.add(plate);
+  for (const s of [-1, 1]) for (let i = 0; i < 9; i++) grp.add(box(0.08, 3, 0.08, 0x2a2a2a, s * (0.4 + i * 0.55), 1.5, 0)); // iron bars
+  for (const s of [-1, 1]) grp.add(box(4.9, 0.12, 0.1, 0x2a2a2a, s * 2.6, 2.9, 0));
+  return grp;
+}
+
+/** Red & white "ROAD CLOSED" barricade. */
+let closedTex: THREE.Texture | null = null;
+export function makeRoadClosed() {
+  closedTex ??= textTexture([{ text: "ROAD", font: "900 64px Poppins, sans-serif", color: "#111" }, { text: "CLOSED", font: "900 64px Poppins, sans-serif", color: "#111" }], 256, 200, "#f8f9fa", "#111");
+  const grp = new THREE.Group();
+  for (let i = 0; i < 6; i++) grp.add(box(0.36, 0.22, 0.08, i % 2 ? 0xffffff : 0xe03131, -0.9 + i * 0.36, 0.95, 0));
+  for (let i = 0; i < 6; i++) grp.add(box(0.36, 0.22, 0.08, i % 2 ? 0xe03131 : 0xffffff, -0.9 + i * 0.36, 0.45, 0));
+  for (const s of [-1, 1]) grp.add(box(0.08, 1.3, 0.5, 0xe03131, s * 1.05, 0.65, 0));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.95), texMat(closedTex)); sign.position.set(0, 1.75, 0.05); grp.add(sign);
+  grp.add(box(0.06, 0.6, 0.06, 0x444444, 0, 1.3, 0));
+  return grp;
+}
+
+/** A cluster of roadside pedestrians (scenery, no collision). */
+export function makeCrowd(n = 5) {
+  const grp = new THREE.Group();
+  for (let i = 0; i < n; i++) { const p = makePerson(); p.position.set(Math.random() * 2.5, 0, (Math.random() - 0.5) * 5); p.rotation.y = Math.random() * Math.PI * 2; grp.add(p); }
+  return grp;
+}
+
+/** Green construction hoarding panel like the BRT works fence. */
+export function makeHoarding(len: number) {
+  const grp = new THREE.Group();
+  grp.add(box(0.12, 2.2, len, 0x2f7d4a, 0, 1.1, 0));
+  for (let z = -len / 2; z <= len / 2; z += 2.5) grp.add(box(0.16, 2.3, 0.12, 0x9aa0a6, 0.05, 1.15, z));
+  grp.add(box(0.14, 0.15, len, 0xe8e2c8, 0, 2.2, 0));
+  return grp;
+}
+
+/** Concrete electric pole with cross arm; wires are drawn between poles by the caller. */
+export function makePowerPole() {
+  const grp = new THREE.Group();
+  grp.add(box(0.25, 9, 0.25, 0x9d968a, 0, 4.5, 0));
+  grp.add(box(2.2, 0.15, 0.15, 0x6c6c6c, 0, 8.5, 0));
+  grp.add(box(0.5, 0.6, 0.4, 0x5c5c5c, 0.3, 6.5, 0)); // transformer box
+  return grp;
+}
+
+/** The finished Red Line: elevated track on pillars with a green BRT bus. */
+export function makeElevatedBRT(len: number) {
+  const grp = new THREE.Group();
+  grp.add(box(7, 0.8, len, 0xcfcac0, 0, 7.2, 0));
+  for (const s of [-1, 1]) grp.add(box(0.25, 1.0, len, 0xb9b3a7, s * 3.4, 8.0, 0));
+  for (let z = -len / 2; z <= len / 2; z += 18) { grp.add(box(1.6, 7, 1.6, 0xbdb7ab, 0, 3.5, z)); grp.add(box(4, 0.8, 2, 0xbdb7ab, 0, 6.6, z)); }
+  const bus = new THREE.Group();
+  bus.add(box(2.6, 2.6, 12, 0x2b9348, 0, 9.0, 0));
+  bus.add(box(2.62, 0.9, 11.6, 0x1b2a35, 0, 9.5, 0));
+  bus.add(box(2.64, 0.25, 12.02, 0xfcc419, 0, 8.3, 0));
+  bus.position.z = -10; bus.name = "brtBus";
+  grp.add(bus);
   return grp;
 }
