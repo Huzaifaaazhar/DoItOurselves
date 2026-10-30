@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">University Road Rider</string>
+    <string name="title_activity_main">University Road Rider</string>
+    <string name="package_name">pk.doitourselves.universityroad</string>
+    <string name="custom_url_scheme">pk.doitourselves.universityroad</string>
+</resources>
