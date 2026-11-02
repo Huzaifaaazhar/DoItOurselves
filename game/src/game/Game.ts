@@ -182,7 +182,7 @@ export class Game {
   }
   roughRoad!: THREE.Mesh; smoothRoad!: THREE.Mesh; smoothTex: THREE.CanvasTexture;
   brtWorks!: THREE.Group; brtDone!: THREE.Group;
-  ended = false; warned = new Set<string>(); swerveCd = 0; status = ""; skyCol = new THREE.Color(0xe9cfa0);
+  ended = false; endDecel = 12; endBlend = 0; warned = new Set<string>(); swerveCd = 0; status = ""; skyCol = new THREE.Color(0xe9cfa0);
   onBanner?: (text: string, kind: "goal" | "warn" | "swerve-left" | "swerve-right" | "info") => void;
 
   // ---------- ride lifecycle ----------
@@ -201,7 +201,8 @@ export class Game {
       const at = (placeDist(p) - this.from) * this.dir;
       if (at < -20 || at > this.len + 60) return;
       const grp = new THREE.Group();
-      grp.add(M.makeGantry(p.name, p.urdu));
+      const gatedDest = p.id === b.id && (b.id === "ned" || b.id === "ku");
+      if (!gatedDest) grp.add(M.makeGantry(p.name, p.urdu));
       const lm = M.makeLandmark(p.kind, p.id, p.name);
       if (this.dir < 0) lm.scale.x = -1; // keep landmarks on the correct side when riding back
       grp.add(lm);
@@ -335,7 +336,7 @@ export class Game {
     o.hit = true;
     this.hits[o.kind as Hazard] = (this.hits[o.kind as Hazard] ?? 0) + 1; this.secs.add(o.sec);
     this.combo = 0;
-    if (this.shield > 0) { this.shield = 0; this.inv = 1; this.toast("Helmet saved you! ⛑️", "info"); audio.crash(false); return; }
+    if (this.shield > 0) { this.shield = 0; this.inv = 1; this.toast("Helmet saved you!", "info"); audio.crash(false); return; }
     this.hp -= dmg; this.inv = 1.1; this.shake = big ? 0.5 : 0.3;
     this.toast(msg); audio.crash(big); vibrate(big ? 160 : 70);
   }
@@ -365,7 +366,7 @@ export class Game {
     let inDust = false;
     for (const o of this.objs) {
       if (o.kind === "dust") {
-        if (this.prog > o.at && this.prog < o.at + o.len!) { inDust = true; if (!o.hit) { o.hit = true; this.hits.dust = (this.hits.dust ?? 0) + 1; this.secs.add(o.sec); this.toast("Dust storm! Aankhon mein mitti 😷", "info"); } }
+        if (this.prog > o.at && this.prog < o.at + o.len!) { inDust = true; if (!o.hit) { o.hit = true; this.hits.dust = (this.hits.dust ?? 0) + 1; this.secs.add(o.sec); this.toast("Dust storm! Aankhon mein mitti", "info"); } }
         continue;
       }
       this.moveObj(o, dt);
@@ -381,24 +382,24 @@ export class Game {
           break;
         case "power":
           o.hit = true; o.mesh.visible = false; audio.powerup();
-          if (o.power === "magnet") { this.magnet = 8 + save.upgrades.magnet * 2; this.toast("Coin magnet! 🧲", "good"); }
-          if (o.power === "helmet") { this.shield = 15; this.toast("Helmet: next hit is free ⛑️", "good"); }
-          if (o.power === "chai") { this.hp = Math.min(this.maxHp, this.hp + 30); this.toast("Chai break! +30 health ☕", "good"); }
+          if (o.power === "magnet") { this.magnet = 8 + save.upgrades.magnet * 2; this.toast("Coin magnet!", "good"); }
+          if (o.power === "helmet") { this.shield = 15; this.toast("Helmet: next hit is free", "good"); }
+          if (o.power === "chai") { this.hp = Math.min(this.maxHp, this.hp + 30); this.toast("Chai break! +30 health", "good"); }
           break;
-        case "pothole": if (!air) this.hurt(o, 10 * sup, "Khadda! 💥"); break;
-        case "manhole": if (!air) { this.v *= 0.3; this.hurt(o, 22 * sup, "Open manhole! Bach gaye 😱", true); } break;
-        case "gutter": if (!air) { this.slow = 1.4; this.hurt(o, 6, "Gutter ka paani 🤢"); audio.splash(); } break;
-        case "sand": if (!air) { this.slow = 1.0; this.hurt(o, 12 * sup, "Mitti ka dher! 🏜️"); } else o.hit = true; break;
+        case "pothole": if (!air) this.hurt(o, 10 * sup, "Khadda!"); break;
+        case "manhole": if (!air) { this.v *= 0.3; this.hurt(o, 22 * sup, "Open manhole! Bach gaye", true); } break;
+        case "gutter": if (!air) { this.slow = 1.4; this.hurt(o, 6, "Gutter ka paani"); audio.splash(); } break;
+        case "sand": if (!air) { this.slow = 1.0; this.hurt(o, 12 * sup, "Mitti ka dher!"); } else o.hit = true; break;
         case "breaker":
           if (air) { o.hit = true; break; }
-          if (this.v > 11) this.hurt(o, 16 * sup, "Speed breaker! Jump or brake ⬆️"); else { o.hit = true; this.toast("Nicely slowed down 👍", "good"); }
+          if (this.v > 11) this.hurt(o, 16 * sup, "Speed breaker! Jump or brake"); else { o.hit = true; this.toast("Nicely slowed down", "good"); }
           break;
-        case "barrier": this.v = 2; this.hurt(o, 25, "Road band hai! BRT ka kaam 🚧", true); break;
-        case "walker": if (!air) { this.v *= 0.4; this.hurt(o, 15, "Bhai dekh ke! 🚶"); } break;
-        case "cattle": this.v *= 0.3; this.hurt(o, 22, "Gaye ko takkar! 🐄", true); break;
-        case "wrongway": this.v *= 0.3; this.hurt(o, 26, "Wrong-way wala! ⛔", true); break;
+        case "barrier": this.v = 2; this.hurt(o, 25, "Road band hai! BRT ka kaam", true); break;
+        case "walker": if (!air) { this.v *= 0.4; this.hurt(o, 15, "Bhai dekh ke!"); } break;
+        case "cattle": this.v *= 0.3; this.hurt(o, 22, "Gaye ko takkar!", true); break;
+        case "wrongway": this.v *= 0.3; this.hurt(o, 26, "Wrong-way wala!", true); break;
         default: {
-          const msg = o.style === "brake" ? "Beech sarak pe brake! 😡" : o.style === "busstop" ? "Bus beech mein ruk gayi 🚌" : o.style === "cut" ? "Lane cutter! 😤" : "Takkar! 💥";
+          const msg = o.style === "brake" ? "Beech sarak pe brake!" : o.style === "busstop" ? "Bus beech mein ruk gayi" : o.style === "cut" ? "Lane cutter!" : "Takkar!";
           this.v = Math.min(this.v, (o.v ?? 5) * 0.4); this.hurt(o, o.kind === "bus" || o.kind === "tanker" ? 28 : 20, msg, true);
         }
       }
@@ -466,6 +467,7 @@ export class Game {
 
   private end(arrived: boolean) {
     this.running = false; this.ended = arrived; audio.stopEngine();
+    this.endDecel = Math.max(8, (this.v * this.v) / (2 * 9)); // come to rest ~9 m past the line, in front of the gate
     if (arrived) setTimeout(() => this.onBanner?.("GOAL REACHED!", "goal"), 0);
     const bonus = arrived ? 20 + Math.round(this.hp / this.maxHp * 30) : 0;
     if (arrived) audio.win();
@@ -475,7 +477,7 @@ export class Game {
   // ---------- render ----------
   private render(dt: number) {
     // after arriving, the bike rolls to a stop in front of the destination
-    if (this.ended) { this.v = Math.max(0, this.v - 12 * dt); this.prog += this.v * dt; this.t += dt; this.x += (0 - this.x) * Math.min(1, dt * 3); this.lane = 1; }
+    if (this.ended) { this.v = Math.max(0, this.v - this.endDecel * dt); this.prog += this.v * dt; this.t += dt; this.x += (0 - this.x) * Math.min(1, dt * 3); this.lane = 1; }
     const idle = !this.running && !this.ended;
     const prog = idle ? (performance.now() / 1000) * 9 : this.prog;
     const p = prog;
@@ -502,8 +504,11 @@ export class Game {
     const sh = this.shake > 0 ? (Math.random() - 0.5) * 0.3 : 0;
     const fovKick = Math.min(8, Math.max(0, this.v - 15) * 0.5);
     this.camera.fov = (this.camera.aspect < 0.75 ? 70 : 58) + fovKick; this.camera.updateProjectionMatrix();
-    this.camera.position.set(this.x * 0.55 + sh, 3.9 + this.y * 0.35, 7.2);
-    this.camera.lookAt(this.x * 0.35, 1.3, -10);
+    // arrival "reveal" shot: ease back and up so the whole gate frames above the rider
+    this.endBlend = this.ended ? Math.min(1, this.endBlend + dt * 0.8) : 0;
+    const e = this.endBlend * this.endBlend * (3 - 2 * this.endBlend);
+    this.camera.position.set(this.x * 0.55 + sh, 3.9 + this.y * 0.35 + e * 1.6, 7.2 + e * 7);
+    this.camera.lookAt(this.x * 0.35, 1.3 + e * 2.4, -10);
 
     // weather & dust
     const [n, f] = this.baseFog;

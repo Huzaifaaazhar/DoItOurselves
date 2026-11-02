@@ -1,3 +1,5 @@
+import type { IconName } from "../components/icons/paths";
+
 // University Road, Karachi: Hassan Square → Safoora Chowrangi.
 //
 // `km` is the approximate real distance from Hassan Square along the road.
@@ -80,18 +82,18 @@ export function sectionAt(d: number): number {
 export const sectionName = (i: number) => `${PLACES[i].name} → ${PLACES[i + 1].name}`;
 
 /** Fixes the player can buy, and which hazards each one removes from a stretch. */
-export interface Fix { id: string; name: string; problem: string; cost: number; removes: (Hazard | "dust")[]; icon: string }
+export interface Fix { id: string; name: string; problem: string; cost: number; removes: (Hazard | "dust")[]; icon: IconName }
 export const FIXES: Fix[] = [
-  { id: "potholes", name: "Resurface the road", problem: "Potholes", cost: 40, removes: ["pothole"], icon: "🕳️" },
-  { id: "manholes", name: "Cover open manholes", problem: "Open manholes", cost: 35, removes: ["manhole"], icon: "⚫" },
-  { id: "sewage", name: "Repair the sewer line", problem: "Gutter ka paani", cost: 60, removes: ["gutter"], icon: "🤢" },
-  { id: "breakers", name: "Remove illegal speed breakers", problem: "Speed breakers", cost: 45, removes: ["breaker"], icon: "〰️" },
-  { id: "construction", name: "Finish the BRT works", problem: "Construction blockage", cost: 90, removes: ["barrier", "sand"], icon: "🚧" },
-  { id: "crossing", name: "Build a pedestrian bridge", problem: "People crossing", cost: 55, removes: ["walker"], icon: "🚶" },
-  { id: "cattle", name: "Clear stray cattle", problem: "Cows on the road", cost: 30, removes: ["cattle"], icon: "🐄" },
-  { id: "traffic", name: "Deploy traffic police", problem: "Lane cutters & sudden brakers", cost: 80, removes: ["car", "rickshaw", "qingqi", "tanker"], icon: "👮" },
-  { id: "busstop", name: "Build proper bus bays", problem: "Buses stopping mid-road", cost: 50, removes: ["bus"], icon: "🚌" },
-  { id: "oneway", name: "Challan wrong-way riders", problem: "Wrong-way traffic", cost: 40, removes: ["wrongway"], icon: "⛔" },
-  { id: "dust", name: "Water and pave the dirt", problem: "Dust storms", cost: 60, removes: ["dust"], icon: "🌪️" },
+  { id: "potholes", name: "Resurface the road", problem: "Potholes", cost: 40, removes: ["pothole"], icon: "pothole" },
+  { id: "manholes", name: "Cover open manholes", problem: "Open manholes", cost: 35, removes: ["manhole"], icon: "manhole" },
+  { id: "sewage", name: "Repair the sewer line", problem: "Gutter ka paani", cost: 60, removes: ["gutter"], icon: "gutter" },
+  { id: "breakers", name: "Remove illegal speed breakers", problem: "Speed breakers", cost: 45, removes: ["breaker"], icon: "breaker" },
+  { id: "construction", name: "Finish the BRT works", problem: "Construction blockage", cost: 90, removes: ["barrier", "sand"], icon: "barrier" },
+  { id: "crossing", name: "Build a pedestrian bridge", problem: "People crossing", cost: 55, removes: ["walker"], icon: "crossing" },
+  { id: "cattle", name: "Clear stray cattle", problem: "Cows on the road", cost: 30, removes: ["cattle"], icon: "cattle" },
+  { id: "traffic", name: "Deploy traffic police", problem: "Lane cutters & sudden brakers", cost: 80, removes: ["car", "rickshaw", "qingqi", "tanker"], icon: "traffic" },
+  { id: "busstop", name: "Build proper bus bays", problem: "Buses stopping mid-road", cost: 50, removes: ["bus"], icon: "bus" },
+  { id: "oneway", name: "Challan wrong-way riders", problem: "Wrong-way traffic", cost: 40, removes: ["wrongway"], icon: "wrongway" },
+  { id: "dust", name: "Water and pave the dirt", problem: "Dust storms", cost: 60, removes: ["dust"], icon: "dust" },
 ];
 export const fixFor = (h: Hazard | "dust") => FIXES.find(f => f.removes.includes(h))!;

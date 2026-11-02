@@ -1,14 +1,15 @@
 import { FIXES, PLACES } from "./data/route";
+import type { IconName } from "./components/icons/paths";
 
 export type UpgradeId = "engine" | "suspension" | "brakes" | "horn" | "helmet" | "magnet";
-export interface Upgrade { id: UpgradeId; name: string; desc: string; icon: string; max: number; base: number }
+export interface Upgrade { id: UpgradeId; name: string; desc: string; icon: IconName; max: number; base: number }
 export const UPGRADES: Upgrade[] = [
-  { id: "engine", name: "Engine tuning", desc: "Higher top speed", icon: "⚙️", max: 5, base: 60 },
-  { id: "suspension", name: "Shocks", desc: "Less damage from potholes & breakers", icon: "🛞", max: 5, base: 50 },
-  { id: "brakes", name: "Brakes", desc: "Stop faster", icon: "🛑", max: 5, base: 40 },
-  { id: "horn", name: "Pressure horn", desc: "People & cattle clear out from further away", icon: "📯", max: 5, base: 35 },
-  { id: "helmet", name: "Helmet & guards", desc: "More health per ride", icon: "⛑️", max: 5, base: 70 },
-  { id: "magnet", name: "Coin magnet", desc: "Magnet power-ups last longer", icon: "🧲", max: 5, base: 45 },
+  { id: "engine", name: "Engine tuning", desc: "Higher top speed", icon: "engine", max: 5, base: 60 },
+  { id: "suspension", name: "Shocks", desc: "Less damage from potholes & breakers", icon: "spring", max: 5, base: 50 },
+  { id: "brakes", name: "Brakes", desc: "Stop faster", icon: "brake", max: 5, base: 40 },
+  { id: "horn", name: "Pressure horn", desc: "People & cattle clear out from further away", icon: "horn", max: 5, base: 35 },
+  { id: "helmet", name: "Helmet & guards", desc: "More health per ride", icon: "helmet", max: 5, base: 70 },
+  { id: "magnet", name: "Coin magnet", desc: "Magnet power-ups last longer", icon: "magnet", max: 5, base: 45 },
 ];
 export const upgradeCost = (u: Upgrade, level: number) => Math.round(u.base * Math.pow(1.7, level));
 

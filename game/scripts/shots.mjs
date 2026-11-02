@@ -2,6 +2,7 @@
 //   npm run shots            → all scenes at 390×844 and 1440×900
 //   npm run shots -- ride    → only scenes whose name contains "ride"
 //   --check                  → fail on any page error (used by `npm test`)
+// Dev routes (/dev/gallery) are only shot when built with NEXT_PUBLIC_DEV_ROUTES=1.
 // Also refreshes public/poster.jpg (the pre-3D poster and no-WebGL fallback) from the menu scene.
 import http from "node:http";
 import fs from "node:fs";
@@ -43,6 +44,7 @@ const SCENES = {
   "ride-improved": { save: save(0, Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i, { potholes: true, construction: true }]))), steps: async p => { await p.click("#home [data-go=plan]"); await p.click("#startRide"); await p.waitForTimeout(3500); } },
   "garage": { save: save(400), steps: async p => { await p.click("#home [data-go=garage]"); await p.waitForTimeout(400); } },
   "fallback": { save: save(0), query: "?fallback=1", steps: async p => p.waitForTimeout(400) },
+  "dev-gallery": { save: save(0), path: "dev/gallery/", steps: async p => p.waitForTimeout(600) },
 };
 const VIEWPORTS = { phone: { width: 390, height: 844 }, desktop: { width: 1440, height: 900 } };
 
@@ -57,8 +59,9 @@ for (const [name, sc] of Object.entries(SCENES)) {
     page.on("console", m => m.type() === "error" && !/poster\.jpg/.test(m.text()) && errors.push(m.text()));
     await page.goto(base);
     await page.evaluate(s => localStorage.setItem("urr-save-v2", JSON.stringify(s)), sc.save);
-    await page.goto(base + (sc.query ?? ""));
-    if (!sc.query) await page.waitForSelector("html[data-ready='1']");
+    await page.goto(base + (sc.path ?? "") + (sc.query ?? ""));
+    if (!sc.query && !sc.path) await page.waitForSelector("html[data-ready='1']");
+    if (sc.path && !fs.existsSync(path.join(ROOT, sc.path))) { console.log(`- ${name}: skipped (build with NEXT_PUBLIC_DEV_ROUTES=1)`); await page.close(); continue; }
     await sc.steps(page);
     const file = path.join(OUT, `${name}-${vp}.png`);
     await page.screenshot({ path: file });

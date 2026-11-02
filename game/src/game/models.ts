@@ -373,7 +373,9 @@ export function makeLandmark(kind: string, id: string, name: string): THREE.Grou
     const top = sphere(1, 0x2b8a3e, 8); top.position.set(-14, 6.8, 0); grp.add(top);
     for (const s of [-1, 1]) { const st = box(14, 0.03, 7, 0x4a4a4c, s * 11, 0.01, 0); grp.add(st); }
   } else if (id === "ned" || id === "ku") {
-    grp.add(makeCampusGate(id === "ned" ? "NED UET, KARACHI" : "UNIVERSITY OF KARACHI", id === "ned" ? "#b0784a" : "#cdb48a"));
+    // roadside entrance, turned to face the road (the destination gate across the road is added by the game)
+    const gate = makeCampusGate(id === "ned" ? "NED UET, KARACHI" : "UNIVERSITY OF KARACHI", id === "ned" ? "#b0784a" : "#cdb48a");
+    gate.position.set(17, 0, 0); gate.rotation.y = -Math.PI / 2; grp.add(gate);
     const col = id === "ned" ? 0xa66f45 : 0xd9cdb4;
     for (let i = 0; i < 3; i++) grp.add(box(10, 6 + i * 2, 8, col, 24 + i * 4, 3 + i, -12 - i * 12));
     for (let i = 0; i < 4; i++) { const t = makeTree(); t.position.set(i % 2 ? 12 : -14, 0, -6 - i * 5); grp.add(t); }

@@ -2,6 +2,7 @@ import { PLACES, FIXES, sectionName, fixFor, Hazard } from "../data/route";
 import { save, persist, isFixed, applyFix, sectionFixedPct, roadFixedPct, UPGRADES, upgradeCost, PAINTS } from "../state";
 import { Game, RideResult, TimeOfDay, Weather, HudState } from "../game/Game";
 import { audio } from "../game/audio";
+import { iconSvg as I } from "../components/icons/paths";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const LAYERS = ["home", "plan", "garage", "fix", "settings", "pause", "result", "tutorial"];
@@ -9,7 +10,7 @@ function show(id: string | null) {
   for (const l of LAYERS) $(l).classList.toggle("on", l === id);
   $("hud").classList.toggle("on", id === null);
 }
-const coinPill = () => `<span class="pill coin-pill">🪙 ${save.coins}</span>`;
+const coinPill = () => `<span class="pill coin-pill">${I("coin", 18)} ${save.coins}</span>`;
 
 export class UI {
   sel = { from: 0, to: PLACES.findIndex(p => p.id === "ku"), time: "day" as TimeOfDay, weather: "clear" as Weather };
@@ -19,7 +20,7 @@ export class UI {
   constructor(private game: Game) {
     game.onHud = s => this.hud(s);
     game.onToast = (m, tone) => this.toast(m, tone);
-    game.onEnd = r => setTimeout(() => this.result(r), r.arrived ? 1800 : 600);
+    game.onEnd = r => { $("hud").classList.remove("on"); setTimeout(() => this.result(r), r.arrived ? 2200 : 600); };
     game.onBanner = (t, k) => this.banner(t, k);
     const unlock = () => audio.unlock();
     addEventListener("pointerdown", unlock); addEventListener("keydown", unlock);
@@ -30,8 +31,8 @@ export class UI {
   private bannerTimer = 0;
   banner(text: string, kind: "goal" | "warn" | "swerve-left" | "swerve-right" | "info") {
     const b = $("banner");
-    const arrow = kind === "swerve-left" ? "⬅ " : kind === "swerve-right" ? "" : "";
-    const arrowR = kind === "swerve-right" ? " ➡" : "";
+    const arrow = kind === "swerve-left" ? I("arrowLeft", 26) : "";
+    const arrowR = kind === "swerve-right" ? I("arrowRight", 26) : "";
     b.innerHTML = `<span>${arrow}${text}${arrowR}</span>`;
     b.className = `show ${kind.startsWith("swerve") ? "swerve" : kind}`;
     clearTimeout(this.bannerTimer);
@@ -43,8 +44,12 @@ export class UI {
     this.game.reset();
     const pct = Math.round(roadFixedPct() * 100);
     $("home").innerHTML = `<div class="wrap">
-      <div class="row">${coinPill()}<div class="spacer"></div><button class="icon-btn" data-go="settings" aria-label="Settings">⚙️</button></div>
-      <div class="logo"><div class="kicker">KARACHI · کراچی</div><h1>University<br><span>Road Rider</span></h1><div class="urdu">یونیورسٹی روڈ</div></div>
+      <div class="row">${coinPill()}<div class="spacer"></div><button class="icon-btn" data-go="settings" aria-label="Settings">${I("settings")}</button></div>
+      <div class="sign-title" role="heading" aria-level="1">
+        <div class="sign-urdu" lang="ur">یونیورسٹی روڈ</div>
+        <div class="sign-en">University Road</div>
+        <div class="sign-sub"><span>Rider</span><span class="sign-km">Hassan Sq. ${I("arrowRight", 16)} Safoora · 8.3 km</span></div>
+      </div>
       <div class="spacer"></div>
       <div class="card">
         <div class="row"><b>Road repaired</b><div class="spacer"></div><b>${pct}%</b></div>
@@ -55,8 +60,8 @@ export class UI {
           <div class="stat"><b>${save.stats.best}</b><small>Best coins</small></div>
         </div>
       </div>
-      <button class="btn primary" data-go="plan">🏍️ Ride</button>
-      <div class="grid2"><button class="btn" data-go="garage">🔧 Garage</button><button class="btn" data-go="fix">🛠️ Fix the road</button></div>
+      <button class="btn primary" data-go="plan">${I("bike", 26)} Ride</button>
+      <div class="grid2"><button class="btn" data-go="garage">${I("wrench")} Garage</button><button class="btn" data-go="fix">${I("shovel")} Fix the road</button></div>
     </div>`;
     this.wire($("home")); show("home");
   }
@@ -95,35 +100,35 @@ export class UI {
     const stops = PLACES.map((p, i) => {
       const [x, y] = pt(i), cls = i === opts.from ? "from" : i === opts.to ? "to" : p.stop ? "" : "minor";
       const left = i % 2 === 0;
-      return `<g class="stop ${cls}" data-i="${i}"><circle cx="${x}" cy="${y}" r="${p.stop ? 8 : 5}" /><text x="${x + (left ? -12 : 12)}" y="${y + 4}" text-anchor="${left ? "end" : "start"}">${p.name.replace(" University", " Uni").replace(" Chowrangi", "")}</text></g>`;
+      return `<g class="stop ${cls}" data-i="${i}"><circle cx="${x}" cy="${y}" r="${p.stop ? 8 : 5}" />${p.stop ? `<text x="${x + (left ? -12 : 12)}" y="${y + 4}" text-anchor="${left ? "end" : "start"}">${shortName(p.name)}</text>` : ""}</g>`;
     }).join("");
-    return `<div class="map"><svg viewBox="0 0 ${W} ${H}"><polyline class="road" points="${path}" />${segs}${trip}${stops}</svg><div class="tag">University Road · Hassan Square ⟶ Safoora</div></div>`;
+    return `<div class="map"><svg viewBox="0 0 ${W} ${H}"><polyline class="road" points="${path}" />${segs}${trip}${stops}</svg><div class="tag">University Road · Hassan Square to Safoora</div></div>`;
   }
 
   // ---------- ride planner ----------
   plan() {
     const stops = PLACES.map((p, i) => ({ p, i })).filter(s => s.p.stop);
-    const opt = (sel: number) => stops.map(s => `<option value="${s.i}" ${s.i === sel ? "selected" : ""}>${s.p.name}</option>`).join("");
+    const opt = (sel: number) => stops.map(s => `<option value="${s.i}" ${s.i === sel ? "selected" : ""}>${shortName(s.p.name)}</option>`).join("");
     const chip = (group: string, val: string, label: string, on: boolean) => `<button class="chip ${on ? "on" : ""}" data-${group}="${val}">${label}</button>`;
     $("plan").innerHTML = `<div class="wrap">
-      <div class="topbar"><button class="icon-btn" data-go="home">←</button><h2>Plan your ride</h2><div class="spacer"></div>${coinPill()}</div>
+      <div class="topbar"><button class="icon-btn" data-go="home" aria-label="Back">${I("back")}</button><h2>Plan your ride</h2><div class="spacer"></div>${coinPill()}</div>
       ${this.mapSvg({ from: this.sel.from, to: this.sel.to })}
       <div class="card">
         <div class="label">Route · tap the map or choose</div>
-        <div class="trip-row"><select id="selFrom">${opt(this.sel.from)}</select><button class="icon-btn" id="swap">⇄</button><select id="selTo">${opt(this.sel.to)}</select></div>
+        <div class="trip-row"><select id="selFrom">${opt(this.sel.from)}</select><button class="icon-btn" id="swap" aria-label="Swap start and destination">${I("swap")}</button><select id="selTo">${opt(this.sel.to)}</select></div>
         <div class="muted" style="margin-top:10px;font-size:13px" id="tripInfo"></div>
       </div>
       <div class="card">
         <div class="label">Time of day</div>
-        <div class="chips">${chip("time", "day", "☀️ Day", this.sel.time === "day")}${chip("time", "evening", "🌇 Evening rush", this.sel.time === "evening")}${chip("time", "night", "🌙 Night", this.sel.time === "night")}</div>
+        <div class="chips">${chip("time", "day", I("sun", 18) + "Day", this.sel.time === "day")}${chip("time", "evening", I("dusk", 18) + "Evening rush", this.sel.time === "evening")}${chip("time", "night", I("moon", 18) + "Night", this.sel.time === "night")}</div>
         <div class="label" style="margin-top:14px">Weather</div>
-        <div class="chips">${chip("weather", "clear", "🌤️ Clear", this.sel.weather === "clear")}${chip("weather", "dusty", "🌪️ Dusty", this.sel.weather === "dusty")}${chip("weather", "rain", "🌧️ Monsoon", this.sel.weather === "rain")}</div>
+        <div class="chips">${chip("weather", "clear", I("clear", 18) + "Clear", this.sel.weather === "clear")}${chip("weather", "dusty", I("dust", 18) + "Dusty", this.sel.weather === "dusty")}${chip("weather", "rain", I("rain", 18) + "Monsoon", this.sel.weather === "rain")}</div>
       </div>
       <div class="card light-card">
         <div class="label" style="color:#5f6368">Road condition</div>
-        <div class="rider-opt"><span class="rider-ic">🏍️</span><div style="flex:1"><b>CD70 rider</b><small>${tripCondition(this.sel.from, this.sel.to)}</small></div><span class="radio on"></span></div>
+        <div class="rider-opt"><span class="rider-ic">${I("bike", 26)}</span><div style="flex:1"><b>CD70 rider</b><small>${tripCondition(this.sel.from, this.sel.to)}</small></div><span class="radio on"></span></div>
       </div>
-      <div class="grid2"><button class="btn map-btn" data-go="fix">Map</button><button class="btn primary select-btn" id="startRide">Select</button></div>
+      <div class="grid2"><button class="btn map-btn" data-go="fix">${I("map")} Map</button><button class="btn primary select-btn" id="startRide">Select</button></div>
     </div>`;
     const root = $("plan"); this.wire(root);
     const km = Math.abs(PLACES[this.sel.to].km - PLACES[this.sel.from].km);
@@ -153,12 +158,12 @@ export class UI {
     $("tutorial").innerHTML = `<div class="wrap"><div class="spacer"></div>
       <div class="card"><h2 style="margin-bottom:6px">How to ride</h2><p class="muted" style="margin:0 0 14px">Reach your stop on University Road, grab coins, and spend them to fix the road for everyone.</p>
       <div class="tut">
-        <div><b>👈 👉</b>Swipe to change lane</div>
-        <div><b>👆</b>Swipe up to jump potholes, gutters &amp; breakers</div>
-        <div><b>👇</b>Hold a swipe down to brake</div>
-        <div><b>📯</b>Horn moves people &amp; cows out of the way</div>
+        <div><b>${I("arrowLeft", 28)}${I("arrowRight", 28)}</b>Swipe to change lane</div>
+        <div><b>${I("arrowUp", 28)}</b>Swipe up to jump potholes, gutters &amp; breakers</div>
+        <div><b>${I("arrowDown", 28)}</b>Hold a swipe down to brake</div>
+        <div><b>${I("horn", 28)}</b>Horn moves people &amp; cows out of the way</div>
       </div>
-      <p class="muted" style="font-size:13px;margin:14px 0 0">Keyboard: ← → / A D lanes · ↑ / Space jump · ↓ / S brake · H horn · Esc pause</p></div>
+      <p class="muted" style="font-size:13px;margin:14px 0 0">Keyboard: arrow keys or A/D lanes · Up/Space jump · Down/S brake · H horn · Esc pause</p></div>
       <button class="btn primary" id="tutGo">Let's go!</button><div class="spacer"></div></div>`;
     $("tutGo").onclick = () => { save.tutorialDone = true; persist(); this.startRide(); };
     show("tutorial");
@@ -169,18 +174,18 @@ export class UI {
   hud(s: HudState) {
     if (!this.hudBuilt) {
       $("hud").innerHTML = `
-        <div class="hud-coin-badge">C</div>
+        <div class="hud-coin-badge" aria-hidden="true">C</div>
         <div class="hud-tags">
           <span class="tag-box" id="tagDist">Distance: 0km</span>
           <span class="tag-box" id="tagCoins">Coins: 0</span>
           <span class="tag-box status" id="tagStatus"></span>
         </div>
-        <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+        <button class="icon-btn" id="pauseBtn" aria-label="Pause">${I("pause")}</button>
         <div class="hud-health"><i id="hpFill"></i></div>
         <div class="next-strip"><span id="nextName"></span><div class="route"><i id="routeFill"></i><b id="routeDot"></b></div></div>
         <div class="powers" id="powers"></div>
         <div class="speedo"><b id="spd">0</b><small>km/h</small></div>
-        <button id="hornBtn" aria-label="Horn">📯</button>`;
+        <button id="hornBtn" aria-label="Horn">${I("horn", 34)}</button>`;
       $("pauseBtn").onclick = () => this.pause();
       $("hornBtn").addEventListener("pointerdown", e => { e.stopPropagation(); this.game.horn(); });
       this.hudBuilt = true;
@@ -191,10 +196,10 @@ export class UI {
     $("tagCoins").textContent = `Coins: ${s.coins}`;
     const st = $("tagStatus"); st.textContent = s.status; st.style.display = s.status ? "" : "none";
     st.classList.toggle("ok", s.status === "Road is smooth");
-    $("nextName").textContent = `📍 ${s.next.replace(" Chowrangi", "")} · ${Math.round(s.nextDist / 600 * 1000)} m`;
+    $("nextName").innerHTML = `${I("pin", 14)} ${s.next.replace(" Chowrangi", "")} · ${Math.round(s.nextDist / 600 * 1000)} m`;
     $("routeFill").style.width = s.progress * 100 + "%"; $("routeDot").style.left = s.progress * 100 + "%";
     $("spd").textContent = String(Math.round(s.speed));
-    $("powers").innerHTML = (s.magnet > 0 ? `<span>🧲 ${Math.ceil(s.magnet)}s</span>` : "") + (s.shield > 0 ? `<span>⛑️ ${Math.ceil(s.shield)}s</span>` : "") + (s.combo >= 10 ? `<span>🔥 x${s.combo}</span>` : "");
+    $("powers").innerHTML = (s.magnet > 0 ? `<span>${I("magnet", 16)} ${Math.ceil(s.magnet)}s</span>` : "") + (s.shield > 0 ? `<span>${I("helmet", 16)} ${Math.ceil(s.shield)}s</span>` : "") + (s.combo >= 10 ? `<span>${I("flame", 16)} x${s.combo}</span>` : "");
   }
   private toastTimer = 0;
   toast(msg: string, tone: "bad" | "good" | "info" = "bad") {
@@ -207,7 +212,7 @@ export class UI {
     if (!this.game.running) return;
     this.game.paused = true; audio.stopEngine();
     $("pause").innerHTML = `<div class="wrap"><div class="spacer"></div><div class="card" style="text-align:center"><h2>Paused</h2><p class="muted">Heading to ${this.game.dest.name}</p>
-      <div style="display:flex;flex-direction:column;gap:10px"><button class="btn primary" id="resume">▶ Resume</button><button class="btn" id="quit">Quit ride</button></div></div><div class="spacer"></div></div>`;
+      <div style="display:flex;flex-direction:column;gap:10px"><button class="btn primary" id="resume">${I("play")} Resume</button><button class="btn" id="quit">Quit ride</button></div></div><div class="spacer"></div></div>`;
     $("resume").onclick = () => { this.game.paused = false; audio.startEngine(); show(null); };
     $("quit").onclick = () => { this.game.paused = false; this.game.running = false; audio.stopEngine(); this.home(); };
     show("pause");
@@ -225,22 +230,22 @@ export class UI {
     const stars = r.arrived ? (r.hp / this.game.maxHp > 0.7 ? 3 : r.hp / this.game.maxHp > 0.35 ? 2 : 1) : 0;
     const worst = (Object.entries(r.hits) as [Hazard | "dust", number][]).sort((a, b) => b[1] - a[1]).slice(0, 4);
     $("result").innerHTML = `<div class="wrap">
-      <div class="result-top"><div class="hud-coin-badge static">C</div>
+      <div class="result-top"><div class="hud-coin-badge static" aria-hidden="true">C</div>
         <span class="goal-ribbon ${r.arrived ? "" : "bad"}">${r.arrived ? "GOAL REACHED!" : "BIKE KHARAB!"}</span>
         <span class="tag-box big">TOTAL COINS: ${total}</span></div>
       <div class="spacer" style="min-height:22vh"></div>
       <div class="card">
         <div class="row" style="margin-bottom:6px"><div><b style="font-size:18px">${r.arrived ? `Pohanch gaye! ${r.dest.name}` : `Broke down before ${r.dest.name}`}</b><div class="muted" style="font-size:13px">${r.arrived ? "You made it through University Road" : "Half your coins are saved"}</div></div><div class="spacer"></div>
-        <div class="stars">${"★".repeat(stars)}<span style="opacity:.25">${"★".repeat(3 - stars)}</span></div></div>
-        <div class="kv"><span>Coins collected</span><span>🪙 ${r.coins}</span></div>
+        <div class="stars" aria-label="${stars} of 3 stars">${Array.from({ length: 3 }, (_, i) => `<span class="${i < stars ? "on" : ""}">${I("star", 24)}</span>`).join("")}</div></div>
+        <div class="kv"><span>Coins collected</span><span>${I("coin", 16)} ${r.coins}</span></div>
         ${r.arrived ? `<div class="kv"><span>Arrival &amp; health bonus</span><span>+${r.bonus}</span></div>` : ""}
         ${r.arrived && mult > 1 ? `<div class="kv"><span>Tough conditions</span><span>×${mult.toFixed(2)}</span></div>` : ""}
-        <div class="kv"><span>Total earned</span><span style="color:var(--accent-2)">🪙 ${total}</span></div>
+        <div class="kv"><span>Total earned</span><span style="color:rgb(var(--warn))">${I("coin", 16)} ${total}</span></div>
         <div class="kv"><span>Time</span><span>${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, "0")}</span></div>
       </div>
-      ${worst.length ? `<div class="card"><div class="label">What hurt you most</div>${worst.map(([k, n]) => { const f = fixFor(k); return `<div class="kv"><span>${f.icon} ${f.problem}</span><span>×${n}</span></div>`; }).join("")}</div>` : ""}
-      <button class="btn primary" id="toFix">🛠️ Road Upgrade</button>
-      <div class="grid2"><button class="btn" id="again">↻ Ride again</button><button class="btn" data-go="home">Home</button></div>
+      ${worst.length ? `<div class="card"><div class="label">What hurt you most</div>${worst.map(([k, n]) => { const f = fixFor(k); return `<div class="kv"><span>${I(f.icon, 18)} ${f.problem}</span><span>×${n}</span></div>`; }).join("")}</div>` : ""}
+      <button class="btn primary" id="toFix">${I("shovel")} Road Upgrade</button>
+      <div class="grid2"><button class="btn" id="again">${I("retry")} Ride again</button><button class="btn" data-go="home">${I("home")} Home</button></div>
     </div>`;
     this.wire($("result"));
     $("toFix").onclick = () => { this.fixSection = r.sections[0] ?? 0; this.fix(); };
@@ -256,12 +261,12 @@ export class UI {
     const hitHere = (f: (typeof FIXES)[number]) => !!(recent && recent.sections.includes(s) && f.removes.some(k => recent.hits[k]));
     // problems that hurt you last ride come first, like the mockup's "Current Condition"
     open.sort((a, b) => Number(hitHere(b)) - Number(hitHere(a)));
-    const cond = open.slice(0, 5).map(f => `<div class="cond ${hitHere(f) ? "hot" : ""}"><span>${f.icon}</span><small>${f.problem.split(" ")[0]}</small></div>`).join("");
+    const cond = open.slice(0, 5).map(f => `<div class="cond ${hitHere(f) ? "hot" : ""}"><span>${I(f.icon, 24)}</span><small>${f.problem.split(" ")[0]}</small></div>`).join("");
     const btns = open.map(f => `<button class="fix-btn" data-fix="${f.id}" ${save.coins < f.cost ? "disabled" : ""}>${shortFix(f.id)}<small>(${f.cost} C)</small></button>`).join("");
     const allCost = open.reduce((a, f) => a + f.cost, 0);
     const secs = PLACES.slice(0, -1).map((_, i) => `<button class="sec ${i === s ? "on" : ""}" data-sec="${i}"><span style="flex:1">${sectionName(i)}</span><span class="pct" style="color:hsl(${sectionFixedPct(i) * 130},80%,60%)">${Math.round(sectionFixedPct(i) * 100)}%</span></button>`).join("");
     $("fix").innerHTML = `<div class="wrap">
-      <div class="topbar"><button class="icon-btn" data-go="home">←</button><h2>Road Upgrade</h2><div class="spacer"></div>${coinPill()}</div>
+      <div class="topbar"><button class="icon-btn" data-go="home" aria-label="Back">${I("back")}</button><h2>Road Upgrade</h2><div class="spacer"></div>${coinPill()}</div>
       <div class="upgrade-card">
         <div class="upgrade-title">ROAD UPGRADE</div>
         ${this.mapSvg({ sections: true, selSection: s })}
@@ -269,8 +274,8 @@ export class UI {
         ${open.length ? `<div class="label dark">Current Condition</div><div class="conds">${cond}</div>
         <div class="fix-grid">${btns}</div>
         <button class="pave-btn" id="paveAll" ${save.coins < allCost ? "disabled" : ""}>Paving ${PLACES[s].name.split(" ")[0]} Segment <small>(${allCost} C)</small></button>`
-        : `<div class="all-fixed">✅ This stretch is fully repaired. Ride it to see the improved road and the finished Red Line.</div>`}
-        ${done.length ? `<div class="label dark" style="margin-top:12px">Already fixed</div><div class="done-list">${done.map(f => `<span>${f.icon} ${f.problem}</span>`).join("")}</div>` : ""}
+        : `<div class="all-fixed">${I("check")} This stretch is fully repaired. Ride it to see the improved road and the finished Red Line.</div>`}
+        ${done.length ? `<div class="label dark" style="margin-top:12px">Already fixed</div><div class="done-list">${done.map(f => `<span>${I(f.icon, 14)} ${f.problem}</span>`).join("")}</div>` : ""}
       </div>
       <div class="card"><div class="label">Choose a stretch</div><div class="sec-list">${secs}</div></div>
     </div>`;
@@ -279,11 +284,11 @@ export class UI {
     root.querySelectorAll<HTMLElement>("[data-fix]").forEach(b => b.onclick = () => {
       const f = FIXES.find(x => x.id === b.dataset.fix)!;
       if (save.coins < f.cost) return;
-      save.coins -= f.cost; applyFix(s, f.id); audio.powerup(); this.toast(`${f.name}: done! ✅`, "good"); this.fix();
+      save.coins -= f.cost; applyFix(s, f.id); audio.powerup(); this.toast(`${f.name}: done`, "good"); this.fix();
     });
     $("paveAll")?.addEventListener("click", () => {
       if (save.coins < allCost) return;
-      save.coins -= allCost; open.forEach(f => applyFix(s, f.id)); audio.win(); this.toast("Stretch fully repaired! 🎉", "good"); this.fix();
+      save.coins -= allCost; open.forEach(f => applyFix(s, f.id)); audio.win(); this.toast("Stretch fully repaired!", "good"); this.fix();
     });
     show("fix");
   }
@@ -292,15 +297,15 @@ export class UI {
   garage() {
     const ups = UPGRADES.map(u => {
       const lvl = save.upgrades[u.id], max = lvl >= u.max, cost = upgradeCost(u, lvl);
-      return `<div class="item"><div class="ic">${u.icon}</div><div class="tx"><b>${u.name}</b><small>${u.desc}</small><div class="pips">${Array.from({ length: u.max }, (_, i) => `<i class="${i < lvl ? "on" : ""}"></i>`).join("")}</div></div>
-        ${max ? `<span class="done">MAX</span>` : `<button class="buy" data-up="${u.id}" ${save.coins < cost ? "disabled" : ""}>🪙 ${cost}</button>`}</div>`;
+      return `<div class="item"><div class="ic">${I(u.icon, 24)}</div><div class="tx"><b>${u.name}</b><small>${u.desc}</small><div class="pips">${Array.from({ length: u.max }, (_, i) => `<i class="${i < lvl ? "on" : ""}"></i>`).join("")}</div></div>
+        ${max ? `<span class="done">MAX</span>` : `<button class="buy" data-up="${u.id}" ${save.coins < cost ? "disabled" : ""}>${I("coin", 16)} ${cost}</button>`}</div>`;
     }).join("");
     const paints = PAINTS.map(p => {
       const owned = save.paints.includes(p.id);
-      return `<button class="swatch ${save.paint === p.id ? "on" : ""}" data-paint="${p.id}" style="background:none"><i style="background:${p.tank}"></i>${owned ? p.name : `🪙 ${p.cost}`}</button>`;
+      return `<button class="swatch ${save.paint === p.id ? "on" : ""}" data-paint="${p.id}" style="background:none"><i style="background:${p.tank}"></i>${owned ? p.name : `${I("coin", 12)} ${p.cost}`}</button>`;
     }).join("");
     $("garage").innerHTML = `<div class="wrap">
-      <div class="topbar"><button class="icon-btn" data-go="home">←</button><h2>Garage · CD70</h2><div class="spacer"></div>${coinPill()}</div>
+      <div class="topbar"><button class="icon-btn" data-go="home" aria-label="Back">${I("back")}</button><h2>Garage · CD70</h2><div class="spacer"></div>${coinPill()}</div>
       <div class="card"><div class="label">Paint</div><div class="swatches">${paints}</div></div>
       <div class="card"><div class="label">Upgrades</div><div style="display:flex;flex-direction:column;gap:8px">${ups}</div></div>
     </div>`;
@@ -320,9 +325,9 @@ export class UI {
 
   // ---------- settings ----------
   settings() {
-    const t = (k: "sound" | "music" | "haptics", label: string) => `<div class="item"><div class="tx"><b>${label}</b></div><button class="toggle ${save.settings[k] ? "on" : ""}" data-t="${k}"></button></div>`;
+    const t = (k: "sound" | "music" | "haptics", label: string) => `<div class="item"><div class="tx"><b>${label}</b></div><button class="toggle ${save.settings[k] ? "on" : ""}" data-t="${k}" role="switch" aria-checked="${save.settings[k]}" aria-label="${label}"></button></div>`;
     $("settings").innerHTML = `<div class="wrap">
-      <div class="topbar"><button class="icon-btn" data-go="home">←</button><h2>Settings</h2></div>
+      <div class="topbar"><button class="icon-btn" data-go="home" aria-label="Back">${I("back")}</button><h2>Settings</h2></div>
       <div class="card" style="display:flex;flex-direction:column;gap:8px">${t("sound", "Sound effects")}${t("music", "Music")}${t("haptics", "Vibration")}
         <div class="item"><div class="tx"><b>Graphics</b><small>Low is smoother on older phones (applies on restart)</small></div><button class="chip ${save.settings.quality === "high" ? "on" : ""}" id="q">${save.settings.quality === "high" ? "High" : "Low"}</button></div>
       </div>
@@ -379,6 +384,7 @@ const SHORT: Record<string, string> = {
   busstop: "Bus Bays", oneway: "Stop Wrong-way", dust: "Stop Dust",
 };
 const shortFix = (id: string) => SHORT[id] ?? id;
+const shortName = (n: string) => n.replace("Federal Urdu University", "Urdu Uni").replace(" University", " Uni").replace(" Chowrangi", "").replace("Hassan Square", "Hassan Sq.");
 
 /** One-line summary of what's still broken on the chosen trip. */
 function tripCondition(from: number, to: number) {
