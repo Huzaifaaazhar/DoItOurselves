@@ -4,24 +4,40 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "android:add": "cap add android",
-    "android:sync": "npm run build && cap sync android",
-    "android:open": "cap open android"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve out",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && node scripts/shots.mjs --check",
+    "shots": "node scripts/shots.mjs",
+    "android:sync": "next build && cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "next build && cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
     "@capacitor/haptics": "^6.0.1",
+    "@fontsource/barlow-condensed": "^5.1.0",
+    "@fontsource/inter": "^5.1.0",
+    "@fontsource/noto-nastaliq-urdu": "^5.1.0",
     "@fontsource/poppins": "^5.1.0",
+    "framer-motion": "^11.11.9",
+    "gsap": "^3.12.5",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "three": "^0.169.0"
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
     "@capacitor/cli": "^6.1.2",
+    "@types/node": "^20.16.11",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
     "@types/three": "^0.169.0",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
   }
 }

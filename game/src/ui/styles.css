@@ -219,3 +219,6 @@ h1, h2, h3 { margin: 0; line-height: 1.1; }
 .all-fixed { text-align: center; color: #69db7c; font-weight: 700; padding: 10px; }
 .done-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .done-list span { font-size: 12px; padding: 4px 8px; border-radius: 6px; background: rgba(105,219,124,.15); color: #b2f2bb; }
+
+/* poster shown before the 3D engine attaches */
+.poster { position: fixed; inset: 0; z-index: 3; background: rgb(var(--ink)) url(/poster.jpg) center / cover no-repeat; }
