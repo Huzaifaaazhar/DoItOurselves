@@ -1,0 +1,31 @@
+/* Design tokens: "Karachi street signage, sun-bleached". Sampled from design-refs/concept-mockup.jpg. */
+:root {
+  /* colour (RGB triplets so Tailwind can apply alpha) */
+  --sand: 217 185 138;
+  --haze: 233 207 160;
+  --asphalt: 46 45 43;
+  --ink: 20 17 14;
+  --paper: 244 236 220;
+  --signage: 17 112 47;
+  --brt: 43 147 72;
+  --warn: 255 212 59;
+  --brick: 176 120 74;
+  --alert: 224 49 49;
+
+  /* type */
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", serif;
+
+  /* radius system: sign plates are nearly square, cards soft, pills round */
+  --r-plate: 6px;
+  --r-card: 14px;
+  --r-pill: 999px;
+
+  /* warm layered shadows, never cool grey */
+  --shadow-1: 0 1px 0 rgb(255 240 210 / 0.08) inset, 0 2px 6px rgb(40 22 5 / 0.35);
+  --shadow-2: 0 1px 0 rgb(255 240 210 / 0.1) inset, 0 8px 24px -6px rgb(40 22 5 / 0.55), 0 2px 6px rgb(40 22 5 / 0.3);
+
+  /* motion */
+  --ease-settle: cubic-bezier(0.34, 1.36, 0.64, 1);
+}
